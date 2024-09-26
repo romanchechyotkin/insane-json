@@ -2446,3 +2446,9 @@ func insaneErr(err error, json string, offset int) error {
 
 	return errors.New(fmt.Sprintf("%s near `%s`\n%s", err.Error(), str, pointer))
 }
+
+func LenghtDecoderPool() int {
+	decoderPoolMu.Lock()
+	defer decoderPoolMu.Unlock()
+	return len(decoderPool)
+}
