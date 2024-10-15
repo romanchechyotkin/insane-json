@@ -63,9 +63,13 @@ var (
 	MapUseThreshold        = 16
 	DisableBeautifulErrors = false // set to "true" for best performance, if you have many decode errors
 
-	decoderPool      = make([]*decoder, 0, 16)
-	decoderPoolIndex = -1
-	decoderPoolMu    = &sync.Mutex{}
+	decoderPool = sync.Pool{
+		New: func() interface{} {
+			decoder := &decoder{}
+			decoder.initPool()
+			return decoder
+		},
+	}
 
 	numbersMap = make([]byte, 256)
 
@@ -144,7 +148,6 @@ type StrictNode struct {
 }
 
 type decoder struct {
-	id        int
 	buf       []byte
 	root      Root
 	nodePool  []*Node
@@ -1819,31 +1822,11 @@ func (d *decoder) expandPool() []*Node {
 }
 
 func getFromPool() *decoder {
-	decoderPoolMu.Lock()
-	defer decoderPoolMu.Unlock()
-
-	decoderPoolIndex++
-	if decoderPoolIndex >= len(decoderPool) {
-		decoder := &decoder{id: decoderPoolIndex}
-		decoder.initPool()
-		decoder.id = decoderPoolIndex
-		decoderPool = append(decoderPool, decoder)
-	}
-
-	return decoderPool[decoderPoolIndex]
+	return decoderPool.Get().(*decoder)
 }
 
 func backToPool(d *decoder) {
-	decoderPoolMu.Lock()
-	defer decoderPoolMu.Unlock()
-
-	decoderPool[d.id] = decoderPool[decoderPoolIndex]
-	decoderPool[d.id].id = d.id
-
-	d.id = decoderPoolIndex
-	decoderPool[decoderPoolIndex] = d
-
-	decoderPoolIndex--
+	decoderPool.Put(d)
 }
 
 func Spawn() *Root {
